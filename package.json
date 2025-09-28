@@ -8,10 +8,9 @@
     "dev": "node --watch bot.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.4",
     "dotenv": "^17.2.2",
     "grammy": "^1.21.1",
     "node-cron": "^3.0.3",
-    "sqlite3": "^5.1.6"
+    "pg": "^8.11.3"
   }
 }
