@@ -1,0 +1,17 @@
+{
+  "name": "whaleooor-telegram-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for whale tracking alerts",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "dev": "node --watch bot.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
+    "dotenv": "^17.2.2",
+    "grammy": "^1.21.1",
+    "node-cron": "^3.0.3",
+    "sqlite3": "^5.1.6"
+  }
+}
