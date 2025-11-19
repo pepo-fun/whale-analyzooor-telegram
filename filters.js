@@ -63,8 +63,8 @@ class FilterEngine {
     return filters;
   }
 
-  // Get token symbol with fallback for known tokens
-  getTokenSymbol(token) {
+  // Get token symbol with fallback for known tokens and API lookup
+  async getTokenSymbol(token, tokenDataCache = null) {
     // First try metadata symbol
     if (token?.metadata?.symbol) {
       return token.metadata.symbol;
@@ -79,7 +79,7 @@ class FilterEngine {
       'HeLp6NuQkmYB4pYWo2zYs22mESHXPQYzXbB8n4V98jwC': 'ai16z',
       'HUMA1821qVDKta3u2ovmfDQeW2fSQouSKE8fkF44wvGw': 'HUMA',
       'bioJ9JTqW62MLz7UKHU69gtKhPpGi1BQhccj2kmSvUJ': 'BIO',
-      
+
       // Additional common tokens
       'So11111111111111111111111111111111111111112': 'SOL',
       'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v': 'USDC',
@@ -100,8 +100,32 @@ class FilterEngine {
       return knownTokens[mint];
     }
 
-    // Last resort: try name or return Unknown
-    return token?.metadata?.name || 'Unknown';
+    // Try name from metadata
+    if (token?.metadata?.name) {
+      return token.metadata.name;
+    }
+
+    // NEW: Fallback to Jupiter/DexScreener API if available in cache
+    if (mint && tokenDataCache) {
+      const cachedData = tokenDataCache.get(mint);
+      if (cachedData?.symbol) {
+        return cachedData.symbol;
+      }
+    }
+
+    // Last resort: fetch from DexScreener directly
+    if (mint) {
+      try {
+        const dexData = await this.getDexScreenerData(mint);
+        if (dexData.symbol) {
+          return dexData.symbol;
+        }
+      } catch (error) {
+        // Silently fail and return Unknown
+      }
+    }
+
+    return 'Unknown';
   }
 
   // Format notification message
@@ -517,29 +541,30 @@ class FilterEngine {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
+
       const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${mint}`, {
         signal: controller.signal
       });
-      
+
       clearTimeout(timeoutId);
-      
-      if (!response.ok) return { price: 0, marketCap: 0, priceChange24h: 0 };
-      
+
+      if (!response.ok) return { price: 0, marketCap: 0, priceChange24h: 0, symbol: null };
+
       const data = await response.json();
-      
+
       if (data.pairs && data.pairs.length > 0) {
         const pair = data.pairs[0];
         return {
           price: parseFloat(pair.priceUsd) || 0,
           marketCap: pair.fdv || pair.marketCap || 0,
-          priceChange24h: parseFloat(pair.priceChange?.h24) || 0
+          priceChange24h: parseFloat(pair.priceChange?.h24) || 0,
+          symbol: pair.baseToken?.symbol || null
         };
       }
-      
-      return { price: 0, marketCap: 0, priceChange24h: 0 };
+
+      return { price: 0, marketCap: 0, priceChange24h: 0, symbol: null };
     } catch (error) {
-      return { price: 0, marketCap: 0, priceChange24h: 0 };
+      return { price: 0, marketCap: 0, priceChange24h: 0, symbol: null };
     }
   }
 

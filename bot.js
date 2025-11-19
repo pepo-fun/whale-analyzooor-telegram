@@ -571,15 +571,21 @@ Choose an option below:`;
           try {
             // Find the symbol for this mint from any swap that contains it
             let symbol = 'Unknown';
+            let token = null;
             for (const swap of swaps) {
               if (swap.inputToken?.mint === mint) {
-                symbol = this.filterEngine.getTokenSymbol(swap.inputToken);
+                token = swap.inputToken;
                 break;
               }
               if (swap.outputToken?.mint === mint) {
-                symbol = this.filterEngine.getTokenSymbol(swap.outputToken);
+                token = swap.outputToken;
                 break;
               }
+            }
+
+            // Get symbol with API fallback
+            if (token) {
+              symbol = await this.filterEngine.getTokenSymbol(token);
             }
 
             // Check if we have Jupiter data for this token
@@ -595,7 +601,8 @@ Choose an option below:`;
                 marketCap: knownSupply ? (jupiterData.price * knownSupply) : (dexData.marketCap || 0),
                 priceChange24h: jupiterData.priceChange24h,
                 isHardcodedSupply: !!knownSupply,
-                source: knownSupply ? 'Jupiter+Hardcoded' : 'Jupiter+DexScreener'
+                source: knownSupply ? 'Jupiter+Hardcoded' : 'Jupiter+DexScreener',
+                symbol: dexData.symbol || symbol  // Store symbol in cache
               };
 
               tokenDataCache.set(mint, finalData);
@@ -627,15 +634,21 @@ Choose an option below:`;
         const fetchPromises = Array.from(uniqueTokens).map(async (mint) => {
           try {
             let symbol = 'Unknown';
+            let token = null;
             for (const swap of swaps) {
               if (swap.inputToken?.mint === mint) {
-                symbol = this.filterEngine.getTokenSymbol(swap.inputToken);
+                token = swap.inputToken;
                 break;
               }
               if (swap.outputToken?.mint === mint) {
-                symbol = this.filterEngine.getTokenSymbol(swap.outputToken);
+                token = swap.outputToken;
                 break;
               }
+            }
+
+            // Get symbol with API fallback
+            if (token) {
+              symbol = await this.filterEngine.getTokenSymbol(token);
             }
             const tokenData = await this.filterEngine.getTokenData(mint, symbol);
             tokenDataCache.set(mint, tokenData);
@@ -713,9 +726,12 @@ Choose an option below:`;
         }
       }
 
-      // After all users are processed, mark first mention tokens as seen
+      // After all users are processed, mark first mention tokens as seen WITH their symbols
       for (const tokenMint of firstMentionTokens) {
-        await this.db.markTokenAsFirstMentioned(tokenMint);
+        // Get symbol from cache if available
+        const cachedData = tokenDataCache.get(tokenMint);
+        const tokenSymbol = cachedData?.symbol || null;
+        await this.db.markTokenAsFirstMentioned(tokenMint, tokenSymbol);
       }
 
     } catch (error) {
