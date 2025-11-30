@@ -132,7 +132,7 @@ class FilterEngine {
   async formatNotification(swap, isFirstMention = false, tokenDataCache = null) {
     const isBuy = this.isBuyTransaction(swap);
     const relevantToken = isBuy ? swap.outputToken : swap.inputToken;
-    const symbol = this.getTokenSymbol(relevantToken);
+    const symbol = await this.getTokenSymbol(relevantToken, tokenDataCache);
     const amount = relevantToken?.amount;
     const usdValue = await this.calculateSwapValueUSD(swap, tokenDataCache);
     const whale = swap.feePayer?.slice(0, 8) + '...';
