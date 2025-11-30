@@ -619,7 +619,8 @@ Choose an option below:`;
               marketCap: 0,
               priceChange24h: 0,
               isHardcodedSupply: false,
-              source: 'Error'
+              source: 'Error',
+              symbol: symbol || null  // Include symbol even on error
             });
           }
         });
@@ -653,7 +654,13 @@ Choose an option below:`;
             const tokenData = await this.filterEngine.getTokenData(mint, symbol);
             tokenDataCache.set(mint, tokenData);
           } catch (error) {
-            tokenDataCache.set(mint, { price: 0, marketCap: 0, priceChange24h: 0, isHardcodedSupply: false });
+            tokenDataCache.set(mint, {
+              price: 0,
+              marketCap: 0,
+              priceChange24h: 0,
+              isHardcodedSupply: false,
+              symbol: symbol || null  // Include symbol even on error
+            });
           }
         });
         await Promise.all(fetchPromises);
