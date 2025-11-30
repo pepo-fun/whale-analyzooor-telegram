@@ -1,6 +1,8 @@
 class FilterEngine {
   constructor() {
     this.userProcessedSwaps = new Map(); // Track per-user to avoid duplicates to same user
+    this.dexScreenerCache = new Map(); // Cache DexScreener API results
+    this.CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
   }
 
   // Main method called by bot - checks if user should be notified
@@ -538,6 +540,12 @@ class FilterEngine {
 
   // DexScreener API for market cap data and backup pricing
   async getDexScreenerData(mint) {
+    // Check cache first
+    const cached = this.dexScreenerCache.get(mint);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
+      return cached.data;
+    }
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -548,23 +556,38 @@ class FilterEngine {
 
       clearTimeout(timeoutId);
 
-      if (!response.ok) return { price: 0, marketCap: 0, priceChange24h: 0, symbol: null };
+      const defaultResponse = { price: 0, marketCap: 0, priceChange24h: 0, symbol: null };
+
+      if (!response.ok) {
+        // Cache failed result to prevent repeated requests
+        this.dexScreenerCache.set(mint, { data: defaultResponse, timestamp: Date.now() });
+        return defaultResponse;
+      }
 
       const data = await response.json();
 
       if (data.pairs && data.pairs.length > 0) {
         const pair = data.pairs[0];
-        return {
+        const result = {
           price: parseFloat(pair.priceUsd) || 0,
           marketCap: pair.fdv || pair.marketCap || 0,
           priceChange24h: parseFloat(pair.priceChange?.h24) || 0,
           symbol: pair.baseToken?.symbol || null
         };
+
+        // Cache successful result
+        this.dexScreenerCache.set(mint, { data: result, timestamp: Date.now() });
+        return result;
       }
 
-      return { price: 0, marketCap: 0, priceChange24h: 0, symbol: null };
+      // Cache empty result
+      this.dexScreenerCache.set(mint, { data: defaultResponse, timestamp: Date.now() });
+      return defaultResponse;
     } catch (error) {
-      return { price: 0, marketCap: 0, priceChange24h: 0, symbol: null };
+      const defaultResponse = { price: 0, marketCap: 0, priceChange24h: 0, symbol: null };
+      // Cache error result
+      this.dexScreenerCache.set(mint, { data: defaultResponse, timestamp: Date.now() });
+      return defaultResponse;
     }
   }
 
